@@ -187,7 +187,7 @@ public class RNFSManager extends ReactContextBaseJavaModule {
   }
 
   @ReactMethod
-  public void downloadFile(String urlStr, final String filepath, final int jobId, final Callback callback) {
+  public void downloadFile(String urlStr, final String filepath, final int jobId, final String headers, final Callback callback) {
     try {
       File file = new File(filepath);
       URL url = new URL(urlStr);
@@ -195,6 +195,7 @@ public class RNFSManager extends ReactContextBaseJavaModule {
       DownloadParams params = new DownloadParams();
       params.src = url;
       params.dest = file;
+      params.headers = headers;
       params.onTaskCompleted = new OnTaskCompleted() {
         public void onTaskCompleted(Exception ex) {
           if (ex == null) {
@@ -227,6 +228,7 @@ public class RNFSManager extends ReactContextBaseJavaModule {
   private class DownloadParams {
     public URL src;
     public File dest;
+    public String headers;
     public OnTaskCompleted onTaskCompleted;
     public OnDownloadProgress onDownloadProgress;
   }
@@ -262,6 +264,14 @@ public class RNFSManager extends ReactContextBaseJavaModule {
 
       try {
         HttpURLConnection connection = (HttpURLConnection)param.src.openConnection();
+
+        String headerPairs[] = param.headers.split("\\r?\\n");
+        for (int i = 0; i < headerPairs.length; i++) {
+          String header[] = headerPairs[i].split(":");
+          if (header.length == 2) {
+            connection.setRequestProperty(header[0], header[1]);
+          }
+        }
 
         connection.setConnectTimeout(5000);
         connection.connect();

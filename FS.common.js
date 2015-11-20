@@ -138,9 +138,16 @@ var RNFS = {
       .catch(convertError);
   },
 
-  downloadFile(url, filepath, progress) {
+  downloadFile(url, filepath, progress, headers) {
     var jobId = getJobId();
     var subscriptionIos, subscriptionAndroid;
+    var headersString = '';
+
+    if (headers) {
+      headersString = Object.keys(headers).map((headerName) => {
+        return headerName + ':' + headers[headerName];
+      }).join('\n');
+    }
 
     if (progress) {
       // Two different styles of subscribing to events for different platforms, hmmm....
@@ -150,7 +157,7 @@ var RNFS = {
         subscriptionAndroid = DeviceEventEmitter.addListener('DownloadProgress-' + jobId, progress);
     }
 
-    return _downloadFile(url, filepath, jobId)
+    return _downloadFile(url, filepath, jobId, headersString)
       .then(res => {
         if (subscriptionIos) subscriptionIos.remove();
         if (subscriptionAndroid) subscriptionAndroid.remove();
