@@ -145,6 +145,7 @@ RCT_EXPORT_METHOD(readFile:(NSString *)filepath
 RCT_EXPORT_METHOD(downloadFile:(NSString *)urlStr
                   filepath:(NSString *)filepath
                   jobId:(nonnull NSNumber *)jobId
+                  headers:(NSString *)headers
                   callback:(RCTResponseSenderBlock)callback)
 {
 
@@ -165,7 +166,7 @@ RCT_EXPORT_METHOD(downloadFile:(NSString *)urlStr
 
   Downloader* downloader = [Downloader alloc];
 
-  [downloader downloadFile:urlStr toFile:filepath callback:downloaderSuccessCallback errorCallback:downloaderErrorCallback progressCallback:downloaderProgressCallback];
+  [downloader downloadFile:urlStr toFile:filepath withHeaders:headers callback:downloaderSuccessCallback errorCallback:downloaderErrorCallback progressCallback:downloaderProgressCallback];
 }
 
 RCT_EXPORT_METHOD(pathForBundle:(NSString *)bundleNamed

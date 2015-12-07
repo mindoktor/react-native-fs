@@ -16,7 +16,7 @@
 
 @implementation Downloader
 
-- (void)downloadFile:(NSString*)urlStr toFile:(NSString*)downloadPath callback:(DownloaderCallback)callback errorCallback:(ErrorCallback)errorCallback progressCallback:(DownloaderCallback)progressCallback
+- (void)downloadFile:(NSString*)urlStr toFile:(NSString*)downloadPath withHeaders:(NSString*)headers callback:(DownloaderCallback)callback errorCallback:(ErrorCallback)errorCallback progressCallback:(DownloaderCallback)progressCallback
 {
   _callback = callback;
   _errorCallback = errorCallback;
@@ -29,6 +29,13 @@
   NSMutableURLRequest* downloadRequest = [NSMutableURLRequest requestWithURL:url
                                                                  cachePolicy:NSURLRequestUseProtocolCachePolicy
                                                              timeoutInterval:30];
+
+  NSArray *splitHeaders = [headers componentsSeparatedByString: @"\n"];
+  
+  for (id splitHeader in splitHeaders) {
+    NSArray *splitValues = [splitHeader componentsSeparatedByString: @":"];
+    [downloadRequest addValue:splitValues[1] forHTTPHeaderField:splitValues[0]];
+  }
 
   [[NSFileManager defaultManager] createFileAtPath:downloadPath contents:nil attributes:nil];
 
