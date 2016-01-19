@@ -10,6 +10,9 @@ import android.util.Base64;
 import android.content.Context;
 import android.support.annotation.Nullable;
 
+import java.io.DataOutputStream;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileInputStream;
@@ -148,6 +151,23 @@ public class RNFSManager extends ReactContextBaseJavaModule {
       boolean success = DeleteRecursive(file);
 
       callback.invoke(null, success, filepath);
+    } catch (Exception ex) {
+      ex.printStackTrace();
+      callback.invoke(makeErrorPayload(ex));
+    }
+  }
+
+  @ReactMethod
+  public void rename(String source, String destination, Callback callback) {
+    try {
+      File fileSource = new File(source);
+      File fileDestination = new File(destination);
+
+      if (!fileSource.exists()) throw new Exception("Source does not exist");
+
+      boolean success = fileSource.renameTo(fileDestination);
+
+      callback.invoke(null, success, destination);
     } catch (Exception ex) {
       ex.printStackTrace();
       callback.invoke(makeErrorPayload(ex));
@@ -309,6 +329,184 @@ public class RNFSManager extends ReactContextBaseJavaModule {
 
     }
   }
+
+
+  @ReactMethod
+  public void uploadFile(final String filepath, final String urlStr, String attachmentName, String attachmentFileName, final int jobId, final String headers, final Callback callback) {
+    try {
+      File file = new File(filepath);
+      URL url = new URL(urlStr);
+
+      UploadParams params = new UploadParams();
+      params.src = file;
+      params.dest = url;
+      params.headers = headers;
+      params.attachmentName = attachmentName;
+      params.attachmentFileName = attachmentFileName;
+      params.onUploadTaskCompleted = new OnUploadTaskCompleted() {
+        public void onUploadTaskCompleted(String response, Exception ex) {
+          if (ex == null) {
+            boolean success = true;
+            callback.invoke(null, success, response);
+          } else {
+            callback.invoke(makeErrorPayload(ex));
+          }
+        }
+      };
+      params.onUploadProgress = new OnUploadProgress() {
+        public void onUploadProgress(int statusCode, int contentLength, int bytesWritten) {
+          WritableMap data = Arguments.createMap();
+          data.putInt("statusCode", statusCode);
+          data.putInt("contentLength", contentLength);
+          data.putInt("bytesWritten", bytesWritten);
+
+          sendEvent(getReactApplicationContext(), "UploadProgress-" + jobId, data);
+        }
+      };
+
+      UploadTask uploadTask = new UploadTask();
+      uploadTask.execute(params);
+    } catch (Exception ex) {
+      ex.printStackTrace();
+      callback.invoke(makeErrorPayload(ex));
+    }
+  }
+
+  private class UploadParams {
+    public File src;
+    public URL dest;
+    public String headers;
+    public String attachmentName;
+    public String attachmentFileName;
+    public OnUploadTaskCompleted onUploadTaskCompleted;
+    public OnUploadProgress onUploadProgress;
+  }
+
+  public interface OnUploadTaskCompleted {
+    void onUploadTaskCompleted(String response, Exception ex);
+  }
+
+  public interface OnUploadProgress {
+    void onUploadProgress(int statusCode, int contentLength, int bytesWritten);
+  }
+
+  private class UploadTask extends AsyncTask<UploadParams, int[], Exception> {
+    private UploadParams mParam;
+
+    protected Exception doInBackground(UploadParams... params) {
+      mParam = params[0];
+
+      try {
+        String response = this.upload(mParam);
+        mParam.onUploadTaskCompleted.onUploadTaskCompleted(response, null);
+      } catch (Exception ex) {
+        mParam.onUploadTaskCompleted.onUploadTaskCompleted(null, ex);
+        return ex;
+      }
+
+      return null;
+    }
+
+    private String upload(UploadParams param) throws IOException {
+      InputStream input = null;
+      OutputStream output = null;
+      String response = "";
+      final String boundary = "32a0617aab4c9fe725f1b5bc441291180ad25b73";
+      final String twoHyphens = "--";
+      final String crlf = "\r\n";
+
+      try {
+        HttpURLConnection connection = (HttpURLConnection)param.dest.openConnection();
+        connection.setUseCaches(false);
+        connection.setDoOutput(true);
+        connection.setRequestMethod("POST");
+        connection.setRequestProperty("Connection", "Keep-Alive");
+        connection.setRequestProperty("Cache-Control", "no-cache");
+        connection.setRequestProperty("Content-Type", "multipart/form-data;boundary=" + boundary);
+
+        String headerPairs[] = param.headers.split("\\r?\\n");
+        for (int i = 0; i < headerPairs.length; i++) {
+          String header[] = headerPairs[i].split(":");
+          if (header.length == 2) {
+            connection.setRequestProperty(header[0], header[1]);
+          }
+        }
+
+        connection.setConnectTimeout(15000);
+
+        DataOutputStream request = new DataOutputStream(
+            connection.getOutputStream());
+
+        request.writeBytes(twoHyphens + boundary + crlf);
+
+        request.writeBytes("Content-Disposition: form-data; name=\"" +
+            param.attachmentName + "\";filename=\"" +
+            param.attachmentFileName + "\"" + crlf);
+
+        request.writeBytes(crlf);
+
+        input = new BufferedInputStream(new FileInputStream(param.src), 128 * 1024);
+
+        byte data[] = new byte[128 * 1024];
+        int total = 0;
+        int count;
+        int fileSize = (int)param.src.length();
+
+        while ((count = input.read(data)) != -1) {
+          total += count;
+          publishProgress(new int[] { 0, fileSize, total }); // todo add length of file
+          request.write(data, 0, count);
+        }
+
+        request.writeBytes(crlf);
+        request.writeBytes(twoHyphens + boundary +
+            twoHyphens + crlf);
+
+        request.flush();
+
+        if (request != null) request.close();
+        if (input != null) input.close();
+
+
+        // Get the response
+        InputStream responseStream = new
+            BufferedInputStream(connection.getInputStream());
+
+        BufferedReader responseStreamReader =
+            new BufferedReader(new InputStreamReader(responseStream));
+
+        String line = "";
+        StringBuilder stringBuilder = new StringBuilder();
+
+        while ((line = responseStreamReader.readLine()) != null) {
+            stringBuilder.append(line).append("\n");
+        }
+        responseStreamReader.close();
+
+        response = stringBuilder.toString();
+        responseStream.close();
+        connection.disconnect();
+
+        publishProgress(new int[] { 0, fileSize, total }); // todo add length of file
+
+      } catch (Exception ex) {
+
+      }
+
+      return response;
+    }
+
+    @Override
+    protected void onProgressUpdate(int[]... values) {
+      super.onProgressUpdate(values);
+      mParam.onUploadProgress.onUploadProgress(values[0][0], values[0][1], values[0][2]);
+    }
+
+    protected void onPostExecute(Exception ex) {
+
+    }
+  }
+
 
   @ReactMethod
   public void pathForBundle(String bundleNamed, Callback callback) {

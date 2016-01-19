@@ -19,8 +19,10 @@ var _stat = Promise.promisify(RNFSManager.stat);
 var _readFile = Promise.promisify(RNFSManager.readFile);
 var _writeFile = Promise.promisify(RNFSManager.writeFile);
 var _unlink = Promise.promisify(RNFSManager.unlink);
+var _rename = Promise.promisify(RNFSManager.rename);
 var _mkdir = Promise.promisify(RNFSManager.mkdir);
 var _downloadFile = Promise.promisify(RNFSManager.downloadFile);
+var _uploadFile = Promise.promisify(RNFSManager.uploadFile);
 var _pathForBundle = Promise.promisify(RNFSManager.pathForBundle);
 
 var convertError = (err) => {
@@ -132,6 +134,11 @@ var RNFS = {
       .catch(convertError);
   },
 
+  rename(source, destination) {
+    return _rename(source, destination)
+      .catch(convertError);
+  },
+
   mkdir(filepath, excludeFromBackup) {
     excludeFromBackup = !!excludeFromBackup;
     return _mkdir(filepath, excludeFromBackup)
@@ -158,6 +165,34 @@ var RNFS = {
     }
 
     return _downloadFile(url, filepath, jobId, headersString)
+      .then(res => {
+        if (subscriptionIos) subscriptionIos.remove();
+        if (subscriptionAndroid) subscriptionAndroid.remove();
+        return res;
+      })
+      .catch(convertError);
+  },
+
+  uploadFile(filepath, url, attachmentName, attachmentFileName, progress, headers) {
+    var jobId = getJobId();
+    var subscriptionIos, subscriptionAndroid;
+    var headersString = '';
+
+    if (headers) {
+      headersString = Object.keys(headers).map((headerName) => {
+        return headerName + ':' + headers[headerName];
+      }).join('\n');
+    }
+
+    if (progress) {
+      // Two different styles of subscribing to events for different platforms, hmmm....
+      if (NativeAppEventEmitter.addListener)
+        subscriptionIos = NativeAppEventEmitter.addListener('UploadProgress-' + jobId, progress);
+      if (NativeAppEventEmitter.addListener)
+        subscriptionAndroid = DeviceEventEmitter.addListener('UploadProgress-' + jobId, progress);
+    }
+
+    return _uploadFile(filepath, url, attachmentName, attachmentFileName, jobId, headersString)
       .then(res => {
         if (subscriptionIos) subscriptionIos.remove();
         if (subscriptionAndroid) subscriptionAndroid.remove();
