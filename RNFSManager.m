@@ -10,6 +10,7 @@
 #import "RCTBridge.h"
 #import "NSArray+Map.h"
 #import "Downloader.h"
+#import "Uploader.h"
 #import "RCTEventDispatcher.h"
 
 @implementation RNFSManager
@@ -169,6 +170,43 @@ RCT_EXPORT_METHOD(downloadFile:(NSString *)urlStr
   [downloader downloadFile:urlStr toFile:filepath withHeaders:headers callback:downloaderSuccessCallback errorCallback:downloaderErrorCallback progressCallback:downloaderProgressCallback];
 }
 
+RCT_EXPORT_METHOD(uploadFile:(NSString *)filepath
+                  urlStr:(NSString *)urlStr
+                  attachmentName:(NSString *)attachmentName
+                  attachmentFileName:(NSString *)attachmentFileName
+                  jobId:(nonnull NSNumber *)jobId
+                  headers:(NSString *)headers
+                  callback:(RCTResponseSenderBlock)callback)
+{
+  
+  UploaderDoneCallback successCallback = ^(NSNumber* statusCode, NSData* response) {
+    NSString* respStr = [[NSString alloc] initWithData:response encoding:NSUTF8StringEncoding];
+    return callback(@[[NSNull null], [NSNumber numberWithBool:YES], respStr]);
+  };
+  
+  ErrorCallback errorCallback = ^(NSError* error) {
+    return callback([self makeErrorPayload:error]);
+  };
+  
+  UploaderCallback progressCallback = ^(NSNumber* statusCode, NSNumber* contentLength, NSNumber* bytesWritten) {
+    [self.bridge.eventDispatcher sendAppEventWithName:[NSString stringWithFormat:@"UploadProgress-%@", jobId]
+                                                 body:@{@"statusCode": statusCode,
+                                                        @"contentLength": contentLength,
+                                                        @"bytesWritten": bytesWritten}];
+  };
+  
+  Uploader* uploader = [Uploader alloc];
+  
+  [uploader uploadFile:filepath
+                urlStr:urlStr
+        attachmentName:attachmentName
+    attachmentFileName:attachmentFileName
+               headers:headers
+              callback:successCallback
+         errorCallback:errorCallback
+      progressCallback:progressCallback];
+}
+
 RCT_EXPORT_METHOD(pathForBundle:(NSString *)bundleNamed
                   callback:(RCTResponseSenderBlock)callback)
 {
@@ -192,6 +230,16 @@ RCT_EXPORT_METHOD(pathForBundle:(NSString *)bundleNamed
                                    userInfo:nil].localizedDescription,
                    [NSNull null]]);
     }
+}
+
+RCT_EXPORT_METHOD(rename:(NSString*)filepath
+             destination:(NSString*)destination
+                callback:(RCTResponseSenderBlock)callback)
+{
+  return callback(@[@{
+      @"description": @"Rename not supported on iOS!!!",
+      @"code": @(1337)
+      }]);
 }
 
 - (NSNumber *)dateToTimeIntervalNumber:(NSDate *)date
