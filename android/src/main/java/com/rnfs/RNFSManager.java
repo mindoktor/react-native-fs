@@ -293,13 +293,15 @@ public class RNFSManager extends ReactContextBaseJavaModule {
           }
         }
 
+        connection.setChunkedStreamingMode(8 * 1024);
+
         connection.setConnectTimeout(5000);
         connection.connect();
 
         int statusCode = connection.getResponseCode();
         int lengthOfFile = connection.getContentLength();
 
-        input = new BufferedInputStream(param.src.openStream(), 8 * 1024);
+        input = new BufferedInputStream(connection.getInputStream(), 8 * 1024);
         output = new FileOutputStream(param.dest);
 
         byte data[] = new byte[8 * 1024];
