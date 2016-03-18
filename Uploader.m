@@ -80,7 +80,7 @@ attachmentFileName:(NSString *)attachmentFileName
 {
   _contentLength = [NSNumber numberWithLong:totalBytesExpectedToWrite];
   _bytesWritten = [NSNumber numberWithLong:totalBytesWritten];
-  return _progressCallback([NSNumber numberWithInt:-1], _contentLength, _bytesWritten);
+  return _progressCallback([NSNumber numberWithInt:0], _contentLength, _bytesWritten);
 }
 
 - (void)connection:(NSURLConnection*)connection didReceiveData:(NSData*)data
