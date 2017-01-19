@@ -7,11 +7,11 @@
 //
 
 #import "RNFSManager.h"
-#import "RCTBridge.h"
+#import <React/RCTBridge.h>
 #import "NSArray+Map.h"
 #import "Downloader.h"
 #import "Uploader.h"
-#import "RCTEventDispatcher.h"
+#import <React/RCTEventDispatcher.h>
 
 @implementation RNFSManager
 
@@ -178,25 +178,25 @@ RCT_EXPORT_METHOD(uploadFile:(NSString *)filepath
                   headers:(NSString *)headers
                   callback:(RCTResponseSenderBlock)callback)
 {
-  
+
   UploaderDoneCallback successCallback = ^(NSNumber* statusCode, NSData* response) {
     NSString* respStr = [[NSString alloc] initWithData:response encoding:NSUTF8StringEncoding];
     return callback(@[[NSNull null], [NSNumber numberWithBool:YES], respStr]);
   };
-  
+
   ErrorCallback errorCallback = ^(NSError* error) {
     return callback([self makeErrorPayload:error]);
   };
-  
+
   UploaderCallback progressCallback = ^(NSNumber* statusCode, NSNumber* contentLength, NSNumber* bytesWritten) {
     [self.bridge.eventDispatcher sendAppEventWithName:[NSString stringWithFormat:@"UploadProgress-%@", jobId]
                                                  body:@{@"statusCode": statusCode,
                                                         @"contentLength": contentLength,
                                                         @"bytesWritten": bytesWritten}];
   };
-  
+
   Uploader* uploader = [Uploader alloc];
-  
+
   [uploader uploadFile:filepath
                 urlStr:urlStr
         attachmentName:attachmentName
